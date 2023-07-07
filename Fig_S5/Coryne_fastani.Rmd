@@ -1,0 +1,58 @@
+---
+title: "Coryne manuscript figure S5 fastani"
+author: Sean Conlan
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+# Introduction
+Coryne manuscript figure S5 fastani
+
+## Input
+
+* **output.avg.txt** - fastani table (smoothed to avg of bidirectional values)
+
+# Setup
+## Paths
+```{r}
+project_path <- "~/Desktop"
+dist_table<-"suppfig5.avg.txt"
+```
+## Libraries
+```{r echo=TRUE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+library(readxl); packageVersion("readxl")
+library(knitr); packageVersion("knitr")
+library(ggplot2); packageVersion("ggplot2")
+library(tidyverse); packageVersion("tidyverse")
+library(reshape2); packageVersion("reshape2")
+library(gplots) #for heatmap.2
+```
+
+# Load table and plot
+```{r fig.width=10,fig.height=10}
+#load data and cast into a matrix
+dat<-read.table(file.path(project_path,dist_table),sep="\t")
+foo<-dcast(dat, V1 ~ V2, value.var='V3')
+foo1 <- foo[,-1]
+rownames(foo1) <- foo[,1]
+
+#for cellnote, put a marker in cells >95%
+sym<-dat
+sym$V3[as.numeric(sym$V3)<95]<-""
+sym$V3[as.numeric(sym$V3)>=95]<-"*"
+sym1<-dcast(sym, V1 ~ V2, value.var='V3')
+sym2 <- sym1[,-1]
+rownames(sym2) <- sym1[,1]
+
+
+#need heatmap.2 for dendrogram and legend
+heatmap.2(as.matrix(foo1),scale="none",trace="none",mar=c(15,15),keysize=0.75,density.info="none",cellnote=as.matrix(sym2),notecol="black",cexRow=1.25,cexCol=1.25)
+
+
+
+```
+
