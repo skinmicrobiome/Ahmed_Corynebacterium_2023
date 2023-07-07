@@ -1,7 +1,8 @@
 # Ahmed_Corynebacterium_2023
 Genomic characterization of the C. tuberculostearicum species complex, a ubiquitous member of the human skin microbiome
 
-* fig_S5
+* Fig_S5 - Files used for ANI heatmap
+* phyloseq_object - phyloseq_object used for ASV analysis
 
 # Amplicon data
 Ahmed_amplicon.xlsx describes the amplicon read data:
