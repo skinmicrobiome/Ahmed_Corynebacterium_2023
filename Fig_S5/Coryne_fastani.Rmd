@@ -17,7 +17,7 @@ Coryne manuscript figure S5 fastani
 # Setup
 ## Paths
 ```{r}
-project_path <- "~/Desktop"
+project_path <- getwd()
 dist_table<-"suppfig5.avg.txt"
 ```
 ## Libraries
@@ -52,7 +52,11 @@ rownames(sym2) <- sym1[,1]
 #need heatmap.2 for dendrogram and legend
 heatmap.2(as.matrix(foo1),scale="none",trace="none",mar=c(15,15),keysize=0.75,density.info="none",cellnote=as.matrix(sym2),notecol="black",cexRow=1.25,cexCol=1.25)
 
-
-
 ```
 
+Export figure
+```{r}
+postscript("ani.ps",width=7,height=7,useKerning=F,paper="letter",horizontal=F)
+heatmap.2(as.matrix(foo1),scale="none",trace="none",mar=c(15,15),keysize=0.75,key.title=NA,density.info="none",cellnote=as.matrix(sym2),notecol="black",cexRow=0.75,cexCol=0.75,adjCol = c(1,0.5))
+dev.off()
+```
