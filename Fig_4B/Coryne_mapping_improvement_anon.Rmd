@@ -1,0 +1,132 @@
+---
+title: 'Coynebacteria mapping efficiency'
+author: Sean Conlan
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+# Introduction
+
+Looking at the HV read mapping to Corynebacterium databases
+
+## Input
+
+* Coryne_mapping_improvement_anon.xlsx - mapping to whole genomes
+* Coryne_gene_mapping_improvement_anon.xlsx - mapping to gene catalog only
+
+# Setup
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
+knitr::opts_chunk$set(fig.width=12, fig.height=6)
+project_dir<-getwd()
+```
+
+## Load libraries
+
+```{r}
+#load libraries
+library(ggplot2); packageVersion("ggplot2")
+library(RColorBrewer); packageVersion("RColorBrewer")
+library(reshape2); packageVersion("reshape2")
+library(viridis); packageVersion("viridis")
+library(tidyverse); packageVersion("tidyverse")
+library(readxl)
+library(ggbreak)
+library(knitr)
+```
+
+# Whole-genome based bowtie database
+
+Whole genomes concatenated and used for the database
+
+* NCBI = Just 5 unique NCBI isolate genomes
+* Lab = 5 NCBI genomes plus 23 dereplicated lab genomes 
+
+## Load table
+```{r}
+path <- paste0(project_dir,"/","Coryne_mapping_improvement_anon.xlsx") #full genome database
+
+dat<-read_excel(path)
+dat$pct_delta<-100*dat$pct_delta
+
+```
+
+# Figure 4B
+```{r fig.width=6,fig.height=4}
+p0pub<-ggplot(dat,aes(x=reorder(Site,pct_delta,median),pct_delta)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width=0.1, size=2) +
+  xlab("Body Site") +
+  #guides(shape=guide_legend(title="subject contributed to\ngenome database?")) +
+  ylab("% Additional Reads Mapped to\nC. tuberculostearicum") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          axis.text = element_text(size = 16),
+          axis.title = element_text(size = 16))
+p0pub
+
+ggsave("fig4B.eps", plot=p0pub, device = "eps")
+```
+
+# Additonal Boxplots
+```{r fig.width=6,fig.height=4}
+p1<-ggplot(dat,aes(x=reorder(Subj,pct_delta,median),pct_delta)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width=0.1, size=2, aes(col=in_set)) +
+  xlab("Subject") +
+  ylab("Additional C.t. Reads Mapped (% increase)")
+  #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+  #        axis.text = element_text(size = 16))
+p1
+
+p1a<-ggplot(dat,aes(in_set,pct_delta)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width=0.1, size=2, aes(col=in_set)) +
+  xlab("Subject") +
+  ylab("Additional C.t. Reads Mapped (% increase)")
+  #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+  #        axis.text = element_text(size = 16))
+p1a
+
+```
+
+## NR (99%) Gene-only bowtie database
+
+Prokka gene calls concatenated and used for the database
+
+* NCBI = Just 5 unique NCBI isolate genomes
+* Lab = 5 NCBI genomes plus 23 dereplicated lab genomes 
+
+### Load table
+```{r}
+path <- paste0(project_dir,"/","Coryne_gene_mapping_improvement_anon.xlsx") #nr gene database
+
+dat<-read_excel(path)
+dat$pct_delta<-100*dat$pct_delta
+
+```
+
+### Boxplots
+```{r fig.width=6,fig.height=4}
+p2<-ggplot(dat,aes(x=reorder(Site,pct_delta,median),pct_delta)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width=0.1, size=2, aes(col=in_set)) +
+  xlab("Body Site") +
+  ylab("Additional C.t. Reads Mapped (% increase)")
+  #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+  #        axis.text = element_text(size = 16))
+p2
+
+
+p3<-ggplot(dat,aes(x=reorder(Subj,pct_delta,median),pct_delta)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width=0.1, size=2, aes(col=in_set)) +
+  xlab("Subject") +
+  ylab("Additional C.t. Reads Mapped (% increase)")
+  #theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+  #        axis.text = element_text(size = 16))
+p3
+
+```
