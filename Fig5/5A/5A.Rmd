@@ -1,0 +1,228 @@
+---
+title: "Growth Curve Analysis"
+author: "Nashwa Ahmed"
+date: '2022-07-13'
+output: html_document
+---
+
+# Introduction
+
+ Calculate area-under-the-curve (AUC) for C. tuberculostearicum differential growth experiments.  
+
+## Input 
+
+* combined_raw.txt - combined growth curve data for experimental replicates (N=2)
+
+## Setup
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+path <- getwd()
+```
+
+## Load libraries 
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library("RColorBrewer")
+library(hms)
+library(growthcurver)
+library(ggpubr)
+library(glue)
+library(Hmisc)
+```
+
+## Read in combined experimental data (blank corrected)
+
+```{r}
+
+rfile <- paste0(path,'/combined_raw.txt')
+rtable <- read.table(rfile, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+
+# convert time format to hours 
+colnames(rtable)[1] <- 'time'
+rtable$time <- sapply(strsplit(rtable$time,":"),function(x) sum(as.numeric(x)*c(1,1/60,1/3600)))
+
+```
+
+
+
+## Map strain name, ribotype, media type, and experiment number to growth data
+```{r}
+
+# calculate growth statistics using GrowthCurver
+gc_out_r <- SummarizeGrowthByPlate(rtable, t_trim=20, bg_correct = 'none')
+head(gc_out_r) 
+
+r.names <- t(as.data.frame(strsplit(gc_out_r$sample,'')))
+r.names <- as.data.frame(r.names)
+gcr <- gc_out_r
+gcr$row <- r.names$V1
+gcr$c <- r.names$V2
+gcr <- gcr %>% mutate(media = case_when( 
+    c %in% c("1","2", "3") ~ "BHI + Tween80",
+    c %in% c("4","5", "6") ~ "Artificial eccrine sweat",
+    c %in% c("7","8", "9") ~ "Artificial apocrine sweat"),
+          strain = case_when( ## add strain 
+    row %in% c("A","I") ~ "acroz",
+    row %in% c("B","J") ~ "acvta",
+    row %in% c("C","K") ~ "acvsz",
+    row %in% c("D","L") ~ "acvsp",
+    row %in% c("E","M") ~ "acrow",
+    row %in% c("F","N") ~ "acrpm",
+    row %in% c("G","O") ~ "acvtb",
+    row %in% c("H","P") ~ "acvth"),
+          phy = case_when(
+    strain == "acrow"~ "A",
+    strain == "acrpm"~ "A",
+    strain == "acvtb"~ "A",
+    strain == "acvth"~ "A",
+    strain == "acroz"~ "B",
+    strain == "acvta"~ "B",
+    strain == "acvsz"~ "B",
+    strain == "acvsp"~ "B"),
+        exp = case_when(
+    row %in% c("A","B","C", "D","E","F","G","H") ~ "1",
+    row %in% c("I","J","K","L","M","N","O", "P") ~ "2"),
+        variable = case_when(
+         phy == "A" & media == "BHI + Tween80" ~ "1",
+         phy == "A" & media == "Artificial eccrine sweat" ~ "2",
+         phy == "A" & media == "Artificial apocrine sweat" ~ "3",
+         phy == "B" & media == "BHI + Tween80" ~ "1",
+         phy == "B" & media == "Artificial eccrine sweat" ~ "2",
+         phy == "B" & media == "Artificial apocrine sweat" ~ "3"
+        )
+          )
+
+gcr$phy <- factor(gcr$phy, levels=c('A','B'))
+gcr$exp <- factor(gcr$exp, levels=c('1','2'))
+gcr$media <- factor(gcr$media, levels=c('BHI + Tween80','Artificial eccrine sweat','Artificial apocrine sweat'))
+
+gcr_auc <- gcr[,c('strain','phy','exp', 'media','variable','auc_e')]
+```
+
+## Perform ANOVA with post-hoc Tukey significance testing for multi-variate (ribotype, media) experiments 
+```{r}
+
+## anova: experiment + phylotype/strain (nested) + phylotype:media 
+interaction <- aov(auc_e ~ exp + phy/strain + phy:media, data = gcr_auc)
+
+summary(interaction)
+#              Df Sum Sq Mean Sq F value Pr(>F)    
+# exp           1   20.0    20.0   5.571 0.0198 *  
+# phy           1  445.2   445.2 123.817 <2e-16 ***
+# phy:strain    6   34.7     5.8   1.610 0.1495    
+# phy:media     4  845.7   211.4  58.800 <2e-16 ***
+
+interaction.tuk <- TukeyHSD(interaction)
+interaction.tuk
+
+#$`phy:media`
+#                                                              diff        lwr        upr     p adj
+#A:Artificial eccrine sweat-A:BHI + Tween80              -5.8286354  -8.075172 -3.5820993 0.0000000
+#B:Artificial eccrine sweat-A:Artificial eccrine sweat   -3.2888177  -5.535354 -1.0422816 0.0010612
+#B:Artificial apocrine sweat-A:Artificial apocrine sweat -3.6743125  -5.920849 -1.4277764 0.0002145
+
+
+## make DF for plotting
+  
+
+  media <- c('BHI + Tween80', 'Artificial eccrine sweat', 'Artificial apocrine sweat')
+  .y. <- c('auc_e','auc_e','auc_e')
+  group1 <- c('A','A','A')
+  group2 <- c('B','B','B')
+  term1 <- c('B:BHI + Tween80','B:Artificial eccrine sweat','B:Artificial apocrine sweat')
+  term2 <- c('A:BHI + Tween80','A:Artificial eccrine sweat','A:Artificial apocrine sweat')
+  
+  # get p-values 
+  p.tuk <- c('0.0000098','0.0010612','0.0002145')
+  p.tuk.adj <- c('1.356e-06','2.346e-10','4.470e-04')
+  p.tuk.sig <- c('0.001','0.001','0.001') ## to plot 'p > 0.001' 
+  y.position <- c('13.2','7.54804','8.5')
+  
+  p.values <- data.frame(media, .y., group1,group2,term1,term2,p.tuk,p.tuk.adj,p.tuk.sig,y.position)
+  p.values$media <- factor(p.values$media,levels=c('BHI + Tween80','Artificial eccrine sweat','Artificial apocrine sweat') )
+  p.values[,7:10] <- as.numeric(unlist(p.values[,7:10]))
+```
+
+## Plot AUC and statistical significance 
+```{r}
+
+## Set theme
+plot_elements <- function(x) {
+      theme_update() +
+        theme(plot.title = element_text(color="black", size=12, face="bold.italic"),
+        axis.title.x = element_text(color="black", size=12, face="bold"),
+        axis.title.y = element_text(color="black", size=12, face="bold"),
+        axis.text.x = element_text(size= 8, hjust=0.5),
+        axis.text.y = element_text(size = 8),
+        panel.spacing = unit(0.25, "lines"),
+       # strip.background = element_rect(fill = "grey"),
+        strip.placement = "outside",
+       # panel.spacing = unit(.2, "lines"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(color = "black", fill = "white"),
+        axis.line = element_line(colour = "black"), 
+        strip.background = element_rect(color = "black", fill="white"),
+        strip.text.x = element_text(color="black", face="bold", size=10),
+       legend.key=element_blank())
+}
+
+#Take average of replicates within experiment (4 strains/experiment)
+mean.aucr <- aggregate(auc_e ~ strain + media + exp + variable, FUN = function(x) c(mean = mean(x), sd = sd(x), se = std.error(x)), data=gcr_auc)
+aucr.avg <- do.call(data.frame, mean.aucr)
+
+#Assign ribotype 
+aucr.avg <- aucr.avg %>% mutate(phy = case_when(
+    strain == "acrow"~ "A",
+    strain == "acrpm"~ "A",
+    strain == "acvtb"~ "A",
+    strain == "acvth"~ "A",
+    strain == "acroz"~ "B",
+    strain == "acvta"~ "B",
+    strain == "acvsz"~ "B",
+    strain == "acvsp"~ "B")
+    )
+
+
+# Update media labels 
+media.label <- c('BHI + Tween80' = 'BHI + 1% Tween80','Artificial eccrine sweat'='Sweat media + \n0.1% Tween80','Artificial apocrine sweat'='Sweat media + \n0.1% Tween80 + \nsynthetic lipid mixture')
+
+aucr.avg <- aucr.avg %>% mutate(media2 = case_when( 
+    media == "BHI + Tween80" ~ 'BHI + 1% Tween80' ,
+    media == "Artificial eccrine sweat" ~ 'Sweat media + \n0.1% Tween80',
+    TRUE ~ 'Sweat media + \n0.1% Tween80 + \nsynthetic lipid mixture')) 
+
+
+aucr.avg$media <- factor(aucr.avg$media, labels=c('BHI + 1% Tween80','Sweat media + \n0.1% Tween80','Sweat media + \n0.1% Tween80 + \nsynthetic lipid mixture'))
+
+## update media labels 
+aucr.df <- aucr.avg 
+levels(aucr.df$media) <- c('BHI + 1% Tween80','Sweat media + 0.1% Tween80','Sweat media + \n0.1% Tween80 + \nsynthetic lipid mixture')
+
+## create p-values DF 
+p.vals <- p.values
+levels(p.vals$media) <- c('BHI + 1% Tween80','Sweat media + 0.1% Tween80','Sweat media + \n0.1% Tween80 + \nsynthetic lipid mixture')
+
+
+## plot 
+
+p.aucr2 <- ggplot(aucr.df, aes(x=phy, y=auc_e.mean)) +  
+  geom_point(cex = 2, pch = 1.0, position = position_jitter(w = 0.2, h = 0), stroke=1,aes(color=exp)) +
+  geom_boxplot(fill=NA, outlier.shape = NA) +
+  stat_boxplot(geom = "errorbar", width = 0.15) +
+  stat_summary(fun=mean, geom='point') +
+  facet_wrap(~ media, labeller=labeller(media=label_wrap_gen(31), media=media.label)) + 
+  plot_elements() + ylab("Average AUC") + xlab("Phylotype") + 
+  guides(fill='none', color='none') + 
+  scale_color_manual(values=c('#3c797d', '#995688'))
+
+p.aucr2 + stat_pvalue_manual(tibble(p.vals), label = "<{p.tuk.sig}")
+
+#ggsave("5A.eps", dpi = 300, width=7.5, height=5)
+
+```
+
+

@@ -1,0 +1,139 @@
+---
+title: "Principal Components Analysis"
+author: "Nashwa Ahmed"
+date: '2022-05-18'
+output: html_document
+---
+
+# Introduction
+
+ Generate PCA plot of gene presence/absence to investigate relationships between skin site and ribotype. 
+
+## Input 
+
+* gene_presence_absence.Rtab - panaroo gene presence/absence table for 28 C. tuberculostearicum genomes
+
+## Setup
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+
+```
+
+# Read table
+```{r}
+path <- getwd()
+dat <- t(read.table(file=paste0(path,'/gene_presence_absence.Rtab'),sep="\t",row.names=1,header=T))
+
+```
+
+# Map metadata (ribotype, skin site) to genomes
+```{r}
+
+asvmd <- c("A",
+            "A",
+            "B",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "B")
+
+sitemd <- c("Sebaceous",
+          "Foot",
+          "Foot",
+          "Moist",
+          "Foot",
+          "Foot",
+          "Moist",
+          "Moist",
+          "Nare",
+          "Moist",
+          "Moist",
+          "Foot",
+          "Dry",
+          "Foot",
+          "Foot",
+          "Moist",
+          "Moist",
+          "Foot",
+          "Moist",
+          "Foot",
+          "Foot",
+          "Foot",
+          "NA",
+          "NA",
+          "Foot")
+
+dat2 <- cbind.data.frame(asv = asvmd, dat)
+dat2 <- cbind.data.frame(site = sitemd, dat2)
+
+dat <- dat2
+
+```
+
+## PCA with ggplot [Figure 3A]
+```{r}
+## do pca on presence-absence (minus metadata columns)
+pca <- prcomp(dat[,-c(1:2)])
+
+## variance explained by each PC
+var <- pca$sdev^2/sum(pca$sdev^2)
+
+## add metadata 
+dfpca <- pca$x
+dfpca <- cbind(site=sitemd, asv=asvmd, hv=hvmd,dfpca)
+
+## plot of PC1, PC2 colorized
+dfpca <- as.data.frame(dfpca)
+dfpca[,4:28] <- sapply(dfpca[,4:28], as.numeric)
+dfpca$site = factor(dfpca$site, levels=c('NA','Sebaceous', 'Dry','Moist','Nare','Foot'))
+dfpca$asv = factor(dfpca$asv)
+
+plot.pca <- NULL
+  
+  ggplot(dfpca, aes(x=PC1,y=PC2, fill=site)) + 
+  geom_point(size=7, aes(color=site, shape=asv)) +
+  scale_colour_manual(values=c('grey', '#d9d2e9', '#ead1dc','#b6d7a8','#cfe2f3','#f9cb9c'),
+                      label=c('NA','Sebaceous', 'Dry','Moist','Nare','Foot'),
+                      guide='none') +
+  scale_fill_manual(values=c('grey', '#d9d2e9', '#ead1dc','#b6d7a8','#cfe2f3','#f9cb9c'),
+                      label=c('NA','Sebaceous', 'Dry','Moist','Nare','Foot'),
+                      guide='none')  +
+  scale_shape_manual(values=c(17,19),
+                     label=c('Phylotype A','Phylotype B'),
+                     guide='none') +
+  labs(x=paste0("PC1: ",format(round(var[1]*100,digits=1),nsmall=1),"%"),
+       y=paste0("PC2: ",round(var[2]*100,digits=1),"%")) +
+  theme(legend.position="right",
+        axis.title.y = element_text(face='bold', color="black", size=15),
+        axis.title.x = element_text(face='bold', color="black", size=15, vjust=-1),
+        axis.text = element_text(size=15),
+        axis.line = element_line(colour = "black"), 
+        panel.spacing = unit(0.25, "lines"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(color = "black", fill = "white"),
+        strip.background = element_rect(color = "black", fill="white"),
+        strip.text.x = element_text(color="black", face="bold", size=10))
+  
+#ggsave("/4A.eps", dpi = 300, device = "eps", height=7, width=7) 
+
+```

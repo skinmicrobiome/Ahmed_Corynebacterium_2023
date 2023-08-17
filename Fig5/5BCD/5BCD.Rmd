@@ -1,0 +1,167 @@
+---
+title: "Experimental growth curves"
+author: "Nashwa Ahmed"
+date: '2022-07-13'
+output: html_document
+---
+
+
+## Introduction
+
+This file produces growth curve plots for a representative differential growth experiment. 
+
+## Setup
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+
+path <- getwd()
+```
+
+## Input 
+
+* 120722.txt - C. tuberculostearicum growth data (OD600/time) for representative experiment
+
+## Load libraries 
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+library(hms)
+library(plotrix)
+```
+
+# Read in growth data (blank-substracted), convert to tidy format 
+```{r}
+
+growth_file <- paste0(path,"/120722.txt") 
+growth <- read.table(growth_file, header= TRUE, sep = "\t", stringsAsFactors = FALSE)
+colnames(growth)[1] <- 'time'
+growth$time <- sapply(strsplit(growth$time,":"),function(x) sum(as.numeric(x)*c(1,1/60,1/3600)))
+
+
+# Map strain name, ribotype and media condition to growth data 
+long_growth <- growth %>% pivot_longer(-c(1), names_to = c('.value','set'), names_pattern = "(.)([0-9]*)" )
+long_growth <- long_growth %>% pivot_longer(-c(1:2), names_to = 'col', values_to = 'value', names_pattern = "(.)" )
+long_growth <- long_growth %>% mutate(media = case_when( 
+    set %in% c("1","2","3") ~ "bhi + tween 1.0%",
+    set %in% c("4","5","6") ~ "eccrine + tween 0.1%",
+    set %in% c("7","8","9") ~ "apocrine + tween 0.1%"),
+          strain = case_when( ## add strain 
+    col == "A" ~ "CTNIH23",
+    col == "B" ~ "CTNIH22",
+    col == "C" ~ "CTNIH21",
+    col == "D" ~ "CTNIH20",
+    col == "E" ~ "CTNIH1",
+    col == "F" ~ "CTNIH6",
+    col == "G" ~ "CTNIH11",
+    col == "H" ~ "CTNIH19"),
+          phy = case_when(
+    strain == "CTNIH1"~ "A",
+    strain == "CTNIH6"~ "A",
+    strain == "CTNIH11"~ "A",
+    strain == "CTNIH19"~ "A",
+    strain == "CTNIH23"~ "B",
+    strain == "CTNIH22"~ "B",
+    strain == "CTNIH21"~ "B",
+    strain == "CTNIH20"~ "B")       
+          )
+
+long_growth$strain <- factor(long_growth$strain, levels=c('CTNIH1'	,'CTNIH6'	,'CTNIH11'	,'CTNIH19',
+                                                      'CTNIH20'	,'CTNIH21'	,'CTNIH22'	,'CTNIH23'))
+long_growth <- select(long_growth, -c(col,set))
+
+
+# Create DF for each media condition 
+bhi <- long_growth %>% filter(media=='bhi + tween 1.0%')
+eccrine <- long_growth %>% filter(media=='eccrine + tween 0.1%')
+apocrine <- long_growth %>% filter(media=='apocrine + tween 0.1%')
+```
+
+
+# Compute average growth values for replicates and subdivide DF by media condition 
+```{r}
+avg <- aggregate(value ~ media + strain + phy + time, FUN = function(x) c(mean = mean(x), sd = sd(x), se=std.error(x)), data=long_growth)
+avg_growth <- do.call(data.frame, avg)
+
+bhi_avg <- avg_growth %>% filter(media=='bhi + tween 1.0%')
+eccrine_avg <- avg_growth %>% filter(media=='eccrine + tween 0.1%')
+apocrine_avg <- avg_growth %>% filter(media=='apocrine + tween 0.1%')
+```
+
+# Define color scheme 
+```{r}
+strain_colors <- c("CTNIH23" = "#a3cce9",
+                   "CTNIH22" = "#5fa2ce", 
+                   "CTNIH21" = "#1170aa", 
+                   "CTNIH20"= "#003366",
+                   "CTNIH1" = "#ffbc79",
+                   "CTNIH6" = "darkorange",
+                   "CTNIH11" = "orangered",
+                   "CTNIH19"="darkorange4")
+```
+
+# Plot growth curve data
+```{r}
+
+## Media condition: bhi + tween80 (1%)
+ggplot(bhi_avg, aes(x=time, y=value.mean, color = strain)) +
+    geom_line(size=2.5) +
+    scale_colour_manual(name="Strain",values = strain_colors) +
+    scale_fill_manual(values = strain_colors) + ggtitle("BHI + 1% Tween80") +
+    geom_errorbar(aes(ymin=value.mean-value.se, ymax=value.mean+value.se), width=.1,
+                 position=position_dodge(.9), color="black") + theme_bw() +
+  xlab('Time (hours)') + ylab(expression('Mean '~OD[600]~' (N = 3)')) +xlim(0,20) + ylim(0,1.25)+
+  theme(plot.title = element_text(color="black", size=12, face="bold"),
+        axis.title.x = element_text(color="black", size=12, face="bold"),
+        axis.title.y = element_text(color="black", size=12, face="bold", hjust=0.5),
+        axis.text.x = element_text(size= 10, vjust=0.5),
+        axis.text.y = element_text(size = 10),
+        legend.text = element_text(size=15),
+        legend.title = element_text(size=15),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                   panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+
+#ggsave(file.path(path,'5B.eps'),dpi = 300) 
+
+## Media condition: eccrine sweat media + tween80 (0.1%)
+ggplot(eccrine_avg, aes(x=time, y=value.mean, color = strain)) +
+    geom_line(size=2.5) +
+    scale_colour_manual(name="Strain",values = strain_colors) +
+    scale_fill_manual(values = strain_colors) + ggtitle("Sweat media + 0.1% Tween80") +
+    geom_errorbar(aes(ymin=value.mean-value.se, ymax=value.mean+value.se), width=.1,
+                 position=position_dodge(.9), color="black") + theme_bw() +
+  xlab('Time (hours)') + ylab(expression('Mean '~OD[600]~' (N = 3)')) +xlim(0,20) + ylim(0,0.5) +
+  theme(plot.title = element_text(color="black", size=12, face="bold"),
+        axis.title.x = element_text(color="black", size=12, face="bold"),
+        axis.title.y = element_text(color="black", size=12, face="bold", hjust=0.5),
+        axis.text.x = element_text(size= 10, vjust=0.5),
+        axis.text.y = element_text(size = 10),
+        legend.text = element_text(size=15),
+        legend.title = element_text(size=15),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                   panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+
+#ggsave(file.path(path,'5C.eps'),dpi = 300)
+
+## Media condition: sweat media + tween80 (0.1%) + synthetic lipids 
+ggplot(apocrine_avg, aes(x=time, y=value.mean, color = strain)) +
+    geom_line(size=2.5) +
+    scale_colour_manual(name="Strain",values = strain_colors) +
+    scale_fill_manual(values = strain_colors) + ggtitle("Sweat media + 0.1% Tween80 + synthetic lipid mixture") +
+    geom_errorbar(aes(ymin=value.mean-value.se, ymax=value.mean+value.se), width=.1,
+                 position=position_dodge(.9), color="black") + theme_bw() +
+  xlab('Time (hours)') + ylab(expression('Mean '~OD[600]~' (N = 3)')) +xlim(0,20) + ylim(0,0.5) +
+  theme(plot.title = element_text(color="black", size=12, face="bold"),
+        axis.title.x = element_text(color="black", size=12, face="bold"),
+        axis.title.y = element_text(color="black", size=12, face="bold", hjust=0.5),
+        axis.text.x = element_text(size= 10, vjust=0.5),
+        axis.text.y = element_text(size = 10),
+        legend.text = element_text(size=15),
+        legend.title = element_text(size=15),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                   panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+#ggsave(file.path(path,'5D.eps'),dpi = 300)
+```
+

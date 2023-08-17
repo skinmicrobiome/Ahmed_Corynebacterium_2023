@@ -1,0 +1,197 @@
+---
+title: "Pangenome Functional annnotation (COG)"
+author: Nashwa Ahmed 
+output: html_document
+date: "2023-05-25"
+---
+
+## Introduction
+Functional annotation of the C. tuberculostearicum pangenome using the NCBI COG database. 
+
+
+## Setup 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+path <- getwd()
+```
+
+## Input 
+
+* gpa.txt - gene presence/absence table for 23 C. tuberculostearicum genomes, extracted from gene_presence_absence_roary.csv
+* egg.txt - NCBI COG DB gene annotation data (via eggNOG-mapper v. 2.1.7), extracted from out.emapper.annotations.xlsx
+* egg2sep.txt - NCBI COG DB gene annotation data for twice-annotated genes
+* egg3sep.txt - NCBI COG DB gene annotation data for thrice-annotated genes
+
+## Load libraries
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE)
+knitr::opts_chunk$set(fig.width=12, fig.height=8)
+library(readxl); packageVersion("readxl")
+library(knitr)
+library(ggplot2); packageVersion("ggplot2")
+library(viridis);#required for the viridis color scales
+library(gridExtra) #required for arraying multiple plots with grid.arrange
+library(tidyverse)
+library(magrittr)
+library(viridis)
+library(yarrr)
+
+```
+
+## Define functional categories according to NCBI COG database (https://www.ncbi.nlm.nih.gov/research/cog)
+```{r}
+
+cog.dic <- list("C"= "Energy production and conversion",
+             "D"= "Cell cycle control and mitosis",
+             "E"="Amino Acid metabolism and transport",
+             "F" = "Nucleotide metabolism and transport",
+             "G"="Carbohydrate metabolism and transport",
+             "H"= "Coenzyme metabolism",
+             "I"="Lipid metabolism",
+             "J"="Translation",
+             "K"="Transcription",
+             "L"="Replication and repair",
+             "M"="Cell wall/membrane/envelop biogenesis",
+             "N"="Cell motility",
+             "O"="Post-translational modification, protein turnover, chaperone functions",
+             "P"="Inorganic ion transport and metabolism",
+             "Q"="Secondary Structure",
+             "T"="Signal Transduction",
+             "U"="Intracellular trafficing and secretion",
+             "V"="Defense mechanisms",
+             "W"="Extracellular structures",
+             "Z"="Cytoskeleton",
+             "S"="Function Uknown")
+```
+
+## Read data tables 
+```{r}
+egg <-  read.table(file=paste0(path,"/egg.txt"), header=T,sep='\t')
+
+gpa <- read.table(file=paste0(path,"/gpa.txt"), header=T,sep='\t')
+gpa <- gpa %>% filter(N != 0) # remove genes with zero counts 
+```
+
+# Merge gene presence/absence table with COG annotations. 
+Note: Some genes are assigned multiple (2-3) COG annotations. All category hits are counted in this analysis. 
+```{r}
+
+colnames(gpa) <- c('query','counts')
+join <- inner_join(gpa, egg, by='query') 
+
+# Make DF for single and multi-annotated genes 
+df1 <- join %>% filter(nchar(COG_category) == 1) 
+df2j <- join %>% filter(nchar(COG_category) == 2) 
+df3j <- join %>% filter(nchar(COG_category) == 3) 
+
+# Export
+#write.table(df2j, '/Users/nashwaahmed/Library/CloudStorage/OneDrive-UW/coryne/COG/rescript/egg2.txt', sep='\t', quote = F, row.names = F)
+#write.table(df3j, '/Users/nashwaahmed/Library/CloudStorage/OneDrive-UW/coryne/COG/rescript/egg3.txt', sep='\t', quote = F, row.names = F)
+
+# Tables manually adjusted to account for gene category counts for genes with multiple calls 
+df2 <- read.table('/Users/nashwaahmed/Library/CloudStorage/OneDrive-UW/coryne/COG/rescript/egg2sep.txt', sep='\t', header = T)
+df3 <- read.table('/Users/nashwaahmed/Library/CloudStorage/OneDrive-UW/coryne/COG/rescript/egg3sep.txt', sep='\t', header = T)
+
+# Re-merge data 
+df <- bind_rows(df1, df2, df3) 
+
+# Remove genes with null annotations  
+df <- df %>% filter(COG_category != '-')  
+
+# Assign pangenome categories 
+df <- df %>% mutate(id = case_when(counts == 28 ~ 'core', 
+                             counts == 1 ~ 'singleton',
+                             TRUE ~ 'accessory'))
+
+df$id <- factor(df$id, levels=c('core','accessory','singleton'))
+
+
+# Get counts per COG annotation per pangenome category 
+data3 <- df %>% mutate(counts = 1) %>% group_by(id, COG_category) %>% summarise(counts=sum(counts))
+
+```
+
+# Plot COG annotation for core, accessory, and singleton pangenome categories
+Superimpose plot with expected proportion of core genes per COG annotation category. 
+```{r}
+
+# Calculate expected proportion of core genes per category, given total core proportion 
+data3 %>% filter(id=='core') %>% summarise(sum = sum(counts)) #1738
+data3 %>% filter(id=='accessory') %>% summarise(sum = sum(counts)) # 1002
+data3 %>% filter(id=='singleton') %>% summarise(sum = sum(counts)) #963
+data3 %>% summarise(sum = sum(counts)) %>% summarise(sum=sum(sum)) #3703 hits  
+
+expected_core <- 1738/3703
+expected_accessory <- 1002/3703
+expected_single <- 963/3703
+
+# Number of hits for each COG annotation [to overlay on plot] 
+data4 <- data3 %>% filter(COG_category != 'S')
+data4 %>% group_by(COG_category) %>% summarise(sum=sum(counts))
+
+data6 <- data3 %>% group_by(COG_category, id) %>% 
+                                mutate(counts=sum(counts)) %>% group_by(COG_category) %>% mutate(proportion = counts/sum(counts)) %>% 
+                                mutate(expected = case_when(id == 'core' ~ expected_core,
+                                                            id == 'accessory' ~ expected_accessory,
+                                                            TRUE ~ expected_single)) %>% 
+                                mutate(expected_counts = expected*counts)
+
+
+# work-around to include category W annotation, which had been dropped because it constitutes 0% of core 
+data6 <- data6 %>% mutate(COG_category = case_when(counts==2 ~ 'W',
+                                          TRUE ~ COG_category))
+
+# arrange categories by proportion_core for plotting  
+data6$id <- factor(data6$id, levels=c('singleton','accessory','core'))
+data6 <- data6 %>% mutate(cog = unlist(cog.dic)[COG_category])
+order <- data6 %>% filter(id=='core') %>% arrange(proportion) %>% ungroup() %>% select(cog)
+order <- c('W'='Extracellular structures',order$cog)
+data6$cog <- factor(data6$cog, levels=rev(order))
+data6$COG_category <- factor(data6$COG_category, levels=rev(names(order)))
+
+# Plot functional annotations 
+
+data6 %>% ggplot(aes(x=cog, y=proportion, fill=id)) + 
+          geom_bar(position='stack', stat='identity') + 
+          coord_flip() + 
+          geom_hline(yintercept=expected_core, linetype = "dashed") +
+          theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                panel.background = element_blank(), axis.line = element_line(colour = "black"),
+               
+                plot.title = element_text(hjust = 1.325, family='Arial', size=15,vjust=-1),
+                axis.title.y = element_text(face='bold', color="black", size=15),
+        axis.title.x = element_text(face='bold', color="black", size=15, vjust=0),
+        axis.text.y = element_text(size=11),
+        axis.text.x = element_text(size=15),
+        legend.position = 'left', legend.key.size = unit(1, 'cm')) +
+          ggtitle("COG Category                                                                                                                 N") + 
+          ylab("Proportion") + xlab('') + labs(fill='') +
+          scale_fill_manual(values=c('#9d983d','#90728f','#e15759')) +
+          annotate(geom="text", x=20, y=0.975, label="2",fontface='bold',color="white",hjust = -.5) + # overlay total gene counts for each category
+        annotate(geom="text", x=19, y=0.975, label="610",fontface='bold',color="white")+
+        annotate(geom="text", x=18, y=0.975, label="178",fontface='bold',color="white")+
+        annotate(geom="text", x=17, y=0.975, label="239",fontface='bold',color="white")+
+        annotate(geom="text", x=16, y=0.975, label="252",fontface='bold',color="white")+
+        annotate(geom="text", x=15, y=0.975, label="259",fontface='bold',color="white")+
+        annotate(geom="text", x=14, y=0.975, label="8",fontface='bold',color="white",hjust = -.5)+
+        annotate(geom="text", x=13, y=0.975, label="711",fontface='bold',color="white")+
+        annotate(geom="text", x=12, y=0.975, label="161",fontface='bold',color="white")+
+        annotate(geom="text", x=11, y=0.975, label="  69",fontface='bold',color="white")+
+        annotate(geom="text", x=10, y=0.975, label="  96",fontface='bold',color="white")+
+        annotate(geom="text", x=9, y=0.975, label=" 53",fontface='bold',color="white")+
+        annotate(geom="text", x=8, y=0.975, label="272",fontface='bold',color="white")+
+        annotate(geom="text", x=7, y=0.975, label="  83",fontface='bold',color="white")+
+        annotate(geom="text", x=6, y=0.975, label="146",fontface='bold',color="white")+
+        annotate(geom="text", x=5, y=0.975, label="147",fontface='bold',color="white")+
+        annotate(geom="text", x=4, y=0.975, label="  89",fontface='bold',color="white")+
+        annotate(geom="text", x=3, y=0.975, label="  39",fontface='bold',color="white")+
+        annotate(geom="text", x=2, y=0.975, label="100",fontface='bold',color="white")+
+        annotate(geom="text", x=1, y=0.975, label="189",fontface='bold',color="white")
+        #annotate(geom='text',x=21,y=0.975,label='N',color='black')
+
+
+#ggsave('S7_legend.eps',dpi = 300, width=12, height=5)
+```
+
+

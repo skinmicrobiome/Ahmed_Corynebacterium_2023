@@ -1,0 +1,131 @@
+---
+title: "Heap's Law Model [Figure 3B]"
+author: "Nashwa Ahmed"
+date: "2023-08-11"
+output: html_document
+---
+
+# Introduction
+
+ Generate gene rarefaction curve for C. tuberculostearicum genome sequences, from which we estimate Heap's Law parameters. 
+
+## Input 
+
+* gene_presence_absence.Rtab - panaroo gene presence/absence table for 28 C. tuberculostearicum genomes
+
+## Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+path <- getwd()
+```
+
+## Load Libraries
+```{r}
+library(vegan)
+library(igraph)
+```
+
+
+## Gene rarefaction curve w/ Heap's law fit for 28 C.t. genomes (including 5 RefSeq) 
+```{r}
+
+#Read in presence/absence table 
+pa <- t(read.table(file=paste0(path,'/gene_presence_absence.Rtab'),sep="\t",row.names=1,header=T))
+sp <- specaccum(pa, 'random', permutations=1000)
+
+#Fit data to Heaps' Law function, n=kN^gamma where 
+
+  # n = richness
+  # k = param a 
+  # N = sites 
+  # gamma = param b
+
+fitHeaps <- nls(richness ~ a*(sites^b), sp[3:4], start=list(a=100, b=-1))
+
+summary(fitHeaps)
+#b (gamma) = 0.2976  
+#a (k) = 1.977e+03
+
+model <- predict(fitHeaps, sp[3:4])
+
+## plot curve with Heap's law fit 
+
+plot(sp, ci.type='poly', col='orange', lwd=4, ci.lty=0, ci.col='#FED8B1', xlab='28 C. tuberculostearicum strains', ylab='Number of genes', main='', font.lab=2)
+lines(model,col='black', lwd=2)
+legend(15, 1500, legend=c(as.expression(bold("Heap's Law:")~"n = k"~N^~gamma),
+                          as.expression("n = 1977 *"~N^~"0.30 ± 0.01")),
+       text.width = 10,
+       cex = 1.2,
+       bg='lightblue')
+legend(15, 2950, legend=c('Pangenome size', "Heap's law fit"), cex = 1.2, col=c('orange','black'), pch='-', pt.cex = 4,text.width = 10)
+
+
+```
+
+Heap's law model for C. tuberculostearicum (strict)
+```{r}
+pa_strict <- pa[c(2,4:6,10:11,13,15:27),] #subset to CTC (strict) 
+
+table(colSums(pa_strict != 0) == 0) # remove the 947/5451 genes absent from strict subset 
+
+pa_strict <- data.frame(pa_strict) %>%
+    select(where(~ any(. != 0))) %>% as.matrix()
+
+#calculate gene accumulation curve: 20 C. t. including 5 RefSeq genomes 
+
+sp_strict <- specaccum(pa_strict, 'random', permutations=1000)
+
+#fit heaps law to curve
+
+# n = richness
+# k = a
+# N = sites 
+# gamma = b
+fitHeaps_strict <- nls(richness ~ a*(sites^b), sp_strict[3:4], start=list(a=100, b=-1))
+summary(fitHeaps_strict)
+#b (gamma) = 0.2537  
+#a (K) = 2.062e+03
+
+model_strict <- predict(fitHeaps_strict, sp_strict[3:4])
+
+## plot curve with Heap's law fit 
+plot(sp_strict, ci.type='poly', col='#5fa2ce', lwd=4, ci.lty=0, ci.col='#a3cce9', xlab='20 C. tuberculostearicum strains', ylab='Number of genes', main='', font.lab=2)
+lines(model_strict,col='black', lwd=2)
+legend(10, 1500, legend=c(as.expression(bold("Heap's Law:")~"n = k"~N^~gamma),
+                          as.expression("n = 2062 *"~N^~"0.25 ± 0.01")),
+       text.width = 8,
+       cex = 1.2,
+       bg='lightblue')
+legend(10, 2950, legend=c('Pangenome size', "Heap's law fit"), cex = 1.2, col=c('orange','black'), pch='-', pt.cex = 4,text.width = 8)
+
+
+
+```
+
+Combined plot [Figure 3B]
+```{r}
+
+#postscript(file="/3B.eps", width=6,height=4)
+
+plot(sp, ci.type='poly', col='#57606c', lwd=4, ci.lty=0, ci.col='#a3acb9', xlab='Number of C. tuberculostearicum strains', main='', font.lab=2, las=1, ylab='')
+lines(sp_strict, ci.type='poly', col='#5fa2ce', lwd=4, ci.lty=0, ci.col='#a3cce9', main='', font.lab=2)
+lines(model,col='black', lwd=2)
+lines(model_strict,col='black', lwd=2)
+text(25,4450,as.expression(gamma~"= 0.30 ± 0.01"),cex=6/7)
+text(17,3450,as.expression(gamma[strict]~"= 0.25 ± 0.01"),cex=6/7)
+title( ylab=substitute(paste(bold('Number of genes'))),line = 3.1)
+
+#dev.off()
+
+```
+
+Combined with colored text 
+```{r}
+plot(sp, ci.type='poly', col='#57606c', lwd=4, ci.lty=0, ci.col='#a3acb9', xlab='Number of C. tuberculostearicum strains', ylab='Number of genes', main='', font.lab=2)
+lines(sp_strict, ci.type='poly', col='#5fa2ce', lwd=4, ci.lty=0, ci.col='#a3cce9', main='', font.lab=2)
+lines(model,col='black', lwd=2)
+lines(model_strict,col='black', lwd=2)
+text(25,4450,as.expression(gamma~"= 0.30 ± 0.01"),cex=6/7)
+text(17,3450,as.expression(gamma~"= 0.25 ± 0.01"),cex=6/7, col="#1f77b4")
+```
