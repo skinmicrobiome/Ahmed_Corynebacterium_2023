@@ -58,16 +58,24 @@ dat$pct_delta<-100*dat$pct_delta
 ```{r fig.width=6,fig.height=4}
 p0pub<-ggplot(dat,aes(x=reorder(Site,pct_delta,median),pct_delta)) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(width=0.1, size=2) +
+  geom_jitter(width=0.1, size=2, aes(shape=in_set)) +
   xlab("Body Site") +
   #guides(shape=guide_legend(title="subject contributed to\ngenome database?")) +
   ylab("% Additional Reads Mapped to\nC. tuberculostearicum") +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-          axis.text = element_text(size = 16),
-          axis.title = element_text(size = 16))
+  theme(legend.position="none",
+        axis.title.y = element_text(face='bold', color="black", size=15),
+        axis.title.x = element_text(face='bold', color="black", size=15, vjust=-1),
+        axis.text = element_text(size=15),
+        axis.line = element_line(colour = "black"), 
+        panel.spacing = unit(0.25, "lines"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(color = "black", fill = "white"),
+        strip.background = element_rect(color = "black", fill="white"),
+        strip.text.x = element_text(color="black", face="bold", size=10))
 p0pub
 
-ggsave("fig4B.eps", plot=p0pub, device = "eps")
+#ggsave("4B.eps", plot=p0pub, device = "eps", height=7, width=7)
 ```
 
 # Additonal Boxplots
