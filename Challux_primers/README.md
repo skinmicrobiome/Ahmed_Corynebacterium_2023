@@ -1,3 +1,4 @@
+# Marker gene primers
 These primers were designed to differentiate the C. hallux (ASV13) genomes from other C. tuberculostearicum species complex genomes (incl sensu stricto C. tub/ASV3).
 
 They have not been tested extensively in vivo but we include them here in case they are useful for screening an isolate collection. Any putative C. hallux should be confirmed by 16S and Whole Genome Sequencing
@@ -8,5 +9,8 @@ Ct0201a	GCTTTTCGACGAGGCAAAGA	59.13	CATAGCTCACACCCAGGGAA	59.09	203	Formimidoylglu
 Ct1713a	ACCCTGTACGGCGATAATGT	58.88	GCATACCAATATCGGACGGC	58.92	184	Putative trans-acting enoyl reductase
 Ct1888a	AAGAACTCATCGCCCGCTAT	59.25	GCCGAATAGCCGCATCATAG	59	231	Glucosamine-6-phosphate deaminase
 ```
+
+# 16S rRNA V1-V3 primers:
+5'-ATTACCGCGGCTGCTGG and 5'-AGAGTTTGATCCTGGCTCAG
 
 For convenience, asv3_13.fa has the fasta sequences of the V1-V3 ASVs for the two dominant C. tuberculostearicum species complex ASVs
