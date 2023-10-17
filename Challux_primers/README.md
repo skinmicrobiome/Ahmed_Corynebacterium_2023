@@ -8,3 +8,5 @@ Ct0201a	GCTTTTCGACGAGGCAAAGA	59.13	CATAGCTCACACCCAGGGAA	59.09	203	Formimidoylglu
 Ct1713a	ACCCTGTACGGCGATAATGT	58.88	GCATACCAATATCGGACGGC	58.92	184	Putative trans-acting enoyl reductase
 Ct1888a	AAGAACTCATCGCCCGCTAT	59.25	GCCGAATAGCCGCATCATAG	59	231	Glucosamine-6-phosphate deaminase
 ```
+
+For convenience, asv3_13.fa has the fasta sequences of the V1-V3 ASVs for the two dominant C. tuberculostearicum species complex ASVs
